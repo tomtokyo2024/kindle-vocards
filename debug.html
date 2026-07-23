@@ -8,20 +8,27 @@
   body { font-family: sans-serif; font-size: 20px; padding: 20px; color: #000000; background: #ffffff; }
   h3 { font-size: 22px; }
   a { font-size: 20px; }
-  #result, #result2 { white-space: pre-wrap; word-wrap: break-word; border: 1px solid #000000; padding: 10px; margin-top: 10px; }
+  .result { white-space: pre-wrap; word-wrap: break-word; border: 1px solid #000000; padding: 10px; margin-top: 10px; }
 </style>
 </head>
 <body>
 
-<h3>测试 1:直接点击链接跳转打开 CSV(整页导航,不经过 JS)</h3>
-<p><a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=80857184&single=true&output=csv">点击打开类目 CSV 链接</a></p>
-<p>点开后如果看到一堆逗号分隔的文字(单词,假名,词性...),说明这条路是通的。如果报错或空白,把错误信息记下来。</p>
+<h3>测试 4(新):类目 CSV,改用 gviz/tq 接口</h3>
+<div id="result4" class="result">测试中...</div>
 
-<h3>测试 2:类目 CSV 的 XHR 请求结果(和 App 用的同一种方式)</h3>
-<div id="result">测试中...</div>
+<h3>测试 5(新):生词本 CSV,改用 gviz/tq 接口</h3>
+<div id="result5" class="result">测试中...</div>
 
-<h3>测试 3:生词本 CSV 的 XHR 请求结果</h3>
-<div id="result2">测试中...</div>
+<hr>
+
+<h3>测试 1:直接点击链接跳转打开 CSV(旧的 publish-to-web 链接,整页导航,不经过 JS)</h3>
+<p><a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=80857184&single=true&output=csv">点击打开类目 CSV 链接(旧)</a></p>
+
+<h3>测试 2:类目 CSV 的 XHR 请求结果(旧的 publish-to-web 链接)</h3>
+<div id="result" class="result">测试中...</div>
+
+<h3>测试 3:生词本 CSV 的 XHR 请求结果(旧的 publish-to-web 链接)</h3>
+<div id="result2" class="result">测试中...</div>
 
 <script>
   function runTest(url, outId) {
@@ -47,6 +54,10 @@
       out.textContent = "抛出异常:" + e.message;
     }
   }
+
+  var SHEET_ID = "1Cs3VzifCQzwrglVBGhSxTmLin2gWVFPiTbMawNv1D_0";
+  runTest("https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&gid=80857184", "result4");
+  runTest("https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&gid=0", "result5");
 
   runTest("https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=80857184&single=true&output=csv", "result");
   runTest("https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=0&single=true&output=csv", "result2");
