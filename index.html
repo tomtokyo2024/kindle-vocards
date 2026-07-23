@@ -300,13 +300,18 @@
 
   // ==== 配置区:生词本云端读写 ====
   var NOTEBOOK_WRITE_URL = "https://script.google.com/macros/s/AKfycbyGL9tXO1WBigSsMkplydjTG77r2s3VvmXL0hntnFnObSPhC-G7I57rw3Fo-uA9zOblrg/exec";
-  var NOTEBOOK_READ_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=0&single=true&output=csv";
+  // 读取改用 gviz/tq 接口(而不是"发布到网络"的 2PACX 链接):
+  // 后者会先返回一个 Content-Type: application/binary 的 307 跳转,Kindle 老版浏览器的 XHR 处理不了这个跳转直接报错;
+  // gviz/tq 是单次 200 + text/csv,没有这层跳转,Kindle 实测可用。使用这个接口要求表格共享权限开启"知道链接的任何人-查看者"。
+  var NOTEBOOK_SHEET_ID = "1Cs3VzifCQzwrglVBGhSxTmLin2gWVFPiTbMawNv1D_0";
+  var NOTEBOOK_READ_CSV_URL = "https://docs.google.com/spreadsheets/d/" + NOTEBOOK_SHEET_ID + "/gviz/tq?tqx=out:csv&gid=0";
   var NOTEBOOK_SECRET = "vocab2026xyz"; // 我会自己手动替换成真实密钥,不要改动这行的位置,方便我查找替换
 
-  // ==== 类目数据源:每个类目对应一个 Google Sheets 发布的 CSV 链接 ====
+  // ==== 类目数据源:每个类目对应一个 Google Sheets 的 gviz/tq CSV 链接(同上,避开 publish-to-web 跳转) ====
   // 以后新增类目,只需要在这里加一行 "类目名": "csv链接",不用改任何渲染逻辑
+  // 链接格式:https://docs.google.com/spreadsheets/d/{表格ID}/gviz/tq?tqx=out:csv&gid={分页gid}
   var CATEGORY_SOURCES = {
-    "特色记忆法则": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=80857184&single=true&output=csv"
+    "特色记忆法则": "https://docs.google.com/spreadsheets/d/" + NOTEBOOK_SHEET_ID + "/gviz/tq?tqx=out:csv&gid=80857184"
   };
 
   // 类目 CSV 列的固定顺序:单词、假名、词性、我的记忆法、中文释义、日文例句、例句中文翻译、JLPT考点
