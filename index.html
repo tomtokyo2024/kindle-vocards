@@ -202,7 +202,7 @@
 
   .field-value {
     display: block;
-    font-size: 36px;
+    font-size: 25.2px;
     color: #000000;
     line-height: 1.6;
   }
@@ -670,11 +670,10 @@
     wrap.appendChild(buildDivider());
 
     appendFieldBlock(wrap, "我的记忆法", item.mnemonic);
-    wrap.appendChild(buildDivider());
     appendFieldBlock(wrap, "中文释义", item.meaning_cn);
+    appendFieldBlock(wrap, "考点", item.jlpt_point);
     appendFieldBlock(wrap, "例句(日)", item.example_jp);
     appendFieldBlock(wrap, "例句(中)", item.example_cn);
-    appendFieldBlock(wrap, "考点", item.jlpt_point);
   }
 
   function buildTextEl(text, cls) {
