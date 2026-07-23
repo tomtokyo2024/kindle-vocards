@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>词卡记忆</title>
+<style>
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+    color: #000000;
+    font-family: -apple-system, "Hiragino Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  body {
+    padding-top: 56px;
+    padding-bottom: 160px;
+  }
+
+  /* ---- 顶部导航栏 ---- */
+  #topBar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 56px;
+    background: #ffffff;
+    border-bottom: 1px solid #000000;
+    z-index: 100;
+  }
+
+  #menuBtn, #actionBtn {
+    position: absolute;
+    top: 0;
+    height: 56px;
+    width: 56px;
+    background: #ffffff;
+    border: none;
+    font-size: 24px;
+    line-height: 56px;
+    padding: 0;
+    text-align: center;
+  }
+
+  #menuBtn { left: 0; }
+  #actionBtn { right: 0; font-size: 26px; }
+
+  #categoryTitle {
+    display: block;
+    width: 100%;
+    text-align: center;
+    line-height: 56px;
+    font-size: 18px;
+    font-weight: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 60px;
+  }
+
+  /* ---- 侧边类目面板 ---- */
+  #clickCatcher {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 290;
+  }
+
+  #sidePanel {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 65%;
+    height: 100%;
+    background: #ffffff;
+    border-right: 1px solid #000000;
+    z-index: 300;
+    overflow-y: auto;
+    padding-top: 54px;
+  }
+
+  #closePanelBtn {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 42px;
+    height: 42px;
+    font-size: 24px;
+    background: #ffffff;
+    border: none;
+  }
+
+  .panel-item {
+    display: block;
+    width: 100%;
+    padding: 14px 18px;
+    text-align: left;
+    background: #ffffff;
+    border: none;
+    border-bottom: 1px solid #cccccc;
+    font-size: 16px;
+    color: #000000;
+  }
+
+  .panel-notebook-entry {
+    text-decoration: underline;
+    font-weight: bold;
+  }
+
+  /* ---- 词卡内容区 ---- */
+  #cardArea {
+    width: 90%;
+    margin: 0 auto;
+    padding: 16px 0;
+  }
+
+  #progressLabel {
+    text-align: center;
+    font-size: 12px;
+    color: #999999;
+    margin: 4px 0 8px 0;
+  }
+
+  #statusMsg {
+    text-align: center;
+    font-size: 13px;
+    color: #000000;
+    min-height: 18px;
+    margin-bottom: 6px;
+  }
+
+  .word-main {
+    text-align: center;
+    font-size: 38px;
+    font-weight: bold;
+    margin: 12px 0 6px 0;
+    word-wrap: break-word;
+  }
+
+  .word-kana {
+    text-align: center;
+    font-size: 18px;
+    color: #666666;
+    margin-bottom: 4px;
+  }
+
+  .word-pos {
+    text-align: center;
+    font-size: 14px;
+    color: #666666;
+    font-style: italic;
+    margin-bottom: 4px;
+  }
+
+  .divider {
+    width: 100%;
+    height: 1px;
+    background: #000000;
+    margin: 18px 0;
+  }
+
+  .field-block {
+    text-align: center;
+    margin: 16px 0;
+  }
+
+  .field-label {
+    display: block;
+    font-size: 12px;
+    color: #888888;
+    margin-bottom: 4px;
+  }
+
+  .field-value {
+    display: block;
+    font-size: 16px;
+    color: #000000;
+    line-height: 1.6;
+  }
+
+  .empty-state, .loading-state {
+    text-align: center;
+    color: #666666;
+    padding: 70px 0;
+    font-size: 15px;
+  }
+
+  /* ---- 底部控制栏 ---- */
+  #bottomBar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: #ffffff;
+    border-top: 1px solid #000000;
+    z-index: 100;
+    padding: 8px 0;
+  }
+
+  .bottom-row {
+    width: 100%;
+    text-align: center;
+    padding: 6px 0;
+  }
+
+  .bottom-row button {
+    display: inline-block;
+    margin: 4px 6px;
+    padding: 10px 16px;
+    font-size: 15px;
+    background: #ffffff;
+    color: #000000;
+    border: 1px solid #000000;
+  }
+
+  .bottom-row button:disabled {
+    color: #aaaaaa;
+    border-color: #aaaaaa;
+  }
+
+  #intervalInput {
+    width: 50px;
+    padding: 8px 4px;
+    font-size: 15px;
+    border: 1px solid #000000;
+    text-align: center;
+    margin: 4px 4px;
+    vertical-align: middle;
+  }
+
+  .interval-label {
+    font-size: 13px;
+    color: #000000;
+    margin: 0 2px;
+  }
+
+  /* ---- 黑屏硬切换 ---- */
+  #blackout {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000000;
+    z-index: 9999;
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="topBar">
+  <button id="menuBtn" onclick="openPanel()">&#9776;</button>
+  <span id="categoryTitle"></span>
+  <button id="actionBtn" onclick="onActionBtnClick()">+</button>
+</div>
+
+<div id="clickCatcher" onclick="closePanel()"></div>
+<div id="sidePanel">
+  <button id="closePanelBtn" onclick="closePanel()">&times;</button>
+  <div id="panelList"></div>
+</div>
+
+<div id="blackout"></div>
+
+<div id="cardArea">
+  <div id="progressLabel"></div>
+  <div id="statusMsg"></div>
+  <div id="contentWrap"></div>
+</div>
+
+<div id="bottomBar">
+  <div class="bottom-row">
+    <button onclick="handlePrev()">前へ</button>
+    <button onclick="handleNext()">次へ</button>
+  </div>
+  <div class="bottom-row">
+    <button onclick="handleShuffle()">乱序</button>
+    <span class="interval-label">间隔(秒)</span>
+    <input type="number" id="intervalInput" value="5" min="1" step="1">
+    <button id="playBtn" onclick="startAutoPlay()">自动播放</button>
+    <button id="pauseBtn" onclick="pauseAutoPlay()" disabled>暂停</button>
+  </div>
+</div>
+
+<script>
+
+  // ==== 配置区:生词本云端读写 ====
+  var NOTEBOOK_WRITE_URL = "https://script.google.com/macros/s/AKfycbyGL9tXO1WBigSsMkplydjTG77r2s3VvmXL0hntnFnObSPhC-G7I57rw3Fo-uA9zOblrg/exec";
+  var NOTEBOOK_READ_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=0&single=true&output=csv";
+  var NOTEBOOK_SECRET = "vocab2026xyz"; // 我会自己手动替换成真实密钥,不要改动这行的位置,方便我查找替换
+
+  // ==== Mock 数据(未来会替换为 Google Sheets 数据源,字段名需保持一致) ====
+  var CATEGORIES = {
+    "红薯老师词": [
+      { word: "覆る", kana: "くつがえる", pos: "自动词", meaning_cn: "被推翻,颠覆", example_jp: "判決が覆った。", example_cn: "判决被推翻了。", mnemonic: "鞋子倒反了!" },
+      { word: "曖昧", kana: "あいまい", pos: "形容动词", meaning_cn: "暧昧,模糊不清", example_jp: "彼の返事は曖昧だった。", example_cn: "他的回答很暧昧。", mnemonic: "暧昧的关系让人看不清楚。" },
+      { word: "潔い", kana: "いさぎよい", pos: "形容词", meaning_cn: "干脆,果断,光明磊落", example_jp: "彼は潔く負けを認めた。", example_cn: "他干脆地承认了失败。", mnemonic: "洁净的人做事很干脆。" },
+      { word: "培う", kana: "つちかう", pos: "他动词", meaning_cn: "培养,培育", example_jp: "経験を培う。", example_cn: "培养经验。", mnemonic: "土里栽培的植物需要培养。" },
+      { word: "妨げる", kana: "さまたげる", pos: "他动词", meaning_cn: "妨碍,阻碍", example_jp: "工事が交通を妨げている。", example_cn: "施工妨碍了交通。", mnemonic: "女字旁,像有人挡在路中间。" },
+      { word: "貫く", kana: "つらぬく", pos: "他动词", meaning_cn: "贯穿,贯彻", example_jp: "初志を貫く。", example_cn: "贯彻初心。", mnemonic: "一根线贯穿始终。" }
+    ],
+    "特色记忆法则": [
+      { word: "曙", kana: "あけぼの", pos: "名词", meaning_cn: "黎明,曙光", example_jp: "新時代の曙。", example_cn: "新时代的曙光。", mnemonic: "日出的样子,曙光初现。" },
+      { word: "戸惑う", kana: "とまどう", pos: "自动词", meaning_cn: "困惑,不知所措", example_jp: "急な質問に戸惑った。", example_cn: "对突然的提问感到困惑。", mnemonic: "门户之间迷了路,不知所措。" },
+      { word: "揺るぎない", kana: "ゆるぎない", pos: "形容词", meaning_cn: "坚定不移的", example_jp: "揺るぎない信念を持つ。", example_cn: "拥有坚定不移的信念。", mnemonic: "不会摇晃(揺る)的信念。" },
+      { word: "紛れる", kana: "まぎれる", pos: "自动词", meaning_cn: "混杂,混入", example_jp: "人混みに紛れる。", example_cn: "混入人群中。", mnemonic: "丝线纠缠不清,混杂在一起。" },
+      { word: "凝る", kana: "こる", pos: "自动词", meaning_cn: "热衷,酸痛,讲究", example_jp: "肩が凝る。", example_cn: "肩膀酸痛。", mnemonic: "冰(冫)冻住了,肩膀僵硬酸痛。" },
+      { word: "煩わしい", kana: "わずらわしい", pos: "形容词", meaning_cn: "麻烦的,繁琐的", example_jp: "手続きが煩わしい。", example_cn: "手续很繁琐。", mnemonic: "两个火(炎)加页,烦躁又麻烦。" }
+    ]
+  };
+
+  var PENDING_QUEUE_KEY = "vocab_pending_sync";
+
+  // 生词本 CSV 列的固定顺序:单词、假名、词性、我的记忆法、中文释义、日文例句、例句中文翻译、JLPT考点、来源类目、加入时间
+  var NOTEBOOK_CSV_FIELDS = ["word", "kana", "pos", "mnemonic", "meaning_cn", "example_jp", "example_cn", "jlpt_point", "source_category", "added_at"];
+
+  // ==== 状态 ====
+  var currentView = "category"; // "category" | "notebook"
+  var currentCategoryName = null;
+  var deck = [];
+  var notebookDeck = [];
+  var notebookLoadState = "idle"; // idle | loading | loaded | error
+  var notebookRequestToken = 0;
+  var currentIndex = 0;
+  var autoPlayTimer = null;
+  var statusTimer = null;
+
+  // ==== 初始化 ====
+  function init() {
+    buildPanel();
+    var firstCategory = Object.keys(CATEGORIES)[0];
+    loadCategory(firstCategory);
+    retryPendingSync();
+  }
+
+  function buildPanel() {
+    var panelList = document.getElementById("panelList");
+    panelList.innerHTML = "";
+
+    var nbBtn = document.createElement("button");
+    nbBtn.className = "panel-item panel-notebook-entry";
+    nbBtn.textContent = "生词本";
+    nbBtn.onclick = function () { selectNotebook(); };
+    panelList.appendChild(nbBtn);
+
+    var keys = Object.keys(CATEGORIES);
+    for (var i = 0; i < keys.length; i++) {
+      var catName = keys[i];
+      var btn = document.createElement("button");
+      btn.className = "panel-item";
+      btn.textContent = catName;
+      btn.setAttribute("data-cat", catName);
+      btn.onclick = (function (name) {
+        return function () { selectCategory(name); };
+      })(catName);
+      panelList.appendChild(btn);
+    }
+  }
+
+  function openPanel() {
+    document.getElementById("sidePanel").style.display = "block";
+    document.getElementById("clickCatcher").style.display = "block";
+  }
+
+  function closePanel() {
+    document.getElementById("sidePanel").style.display = "none";
+    document.getElementById("clickCatcher").style.display = "none";
+  }
+
+  function selectCategory(catName) {
+    closePanel();
+    loadCategory(catName);
+  }
+
+  function selectNotebook() {
+    closePanel();
+    loadNotebookView();
+  }
+
+  // ==== 类目视图 ====
+  function loadCategory(catName) {
+    stopAutoPlayInternal();
+    currentView = "category";
+    currentCategoryName = catName;
+    deck = [];
+    var src = CATEGORIES[catName];
+    for (var i = 0; i < src.length; i++) {
+      deck.push(cloneWord(src[i]));
+    }
+    currentIndex = 0;
+    updateTopBarForView();
+    renderCurrent();
+  }
+
+  function cloneWord(w) {
+    var out = {};
+    for (var k in w) {
+      if (Object.prototype.hasOwnProperty.call(w, k)) {
+        out[k] = w[k];
+      }
+    }
+    return out;
+  }
+
+  // ==== 生词本视图 ====
+  function loadNotebookView() {
+    stopAutoPlayInternal();
+    currentView = "notebook";
+    currentIndex = 0;
+    updateTopBarForView();
+    notebookLoadState = "loading";
+    renderCurrent();
+    fetchNotebookCsv();
+  }
+
+  function fetchNotebookCsv() {
+    notebookRequestToken = notebookRequestToken + 1;
+    var myToken = notebookRequestToken;
+    var xhr = new XMLHttpRequest();
+    try {
+      xhr.open("GET", NOTEBOOK_READ_CSV_URL, true);
+      xhr.timeout = 8000;
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          if (myToken !== notebookRequestToken) { return; }
+          if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
+            notebookDeck = parseCsvToWords(xhr.responseText);
+            notebookLoadState = "loaded";
+          } else {
+            notebookLoadState = "error";
+          }
+          if (currentView === "notebook") {
+            currentIndex = 0;
+            renderCurrent();
+          }
+        }
+      };
+      xhr.onerror = function () {
+        if (myToken !== notebookRequestToken) { return; }
+        notebookLoadState = "error";
+        if (currentView === "notebook") { renderCurrent(); }
+      };
+      xhr.ontimeout = function () {
+        if (myToken !== notebookRequestToken) { return; }
+        notebookLoadState = "error";
+        if (currentView === "notebook") { renderCurrent(); }
+      };
+      xhr.send();
+    } catch (e) {
+      notebookLoadState = "error";
+      renderCurrent();
+    }
+  }
+
+  // 极简 CSV 解析器,处理逗号分隔和引号转义
+  function parseCsv(text) {
+    var rows = [];
+    var row = [];
+    var field = "";
+    var inQuotes = false;
+    var i = 0;
+    var len = text.length;
+    while (i < len) {
+      var c = text.charAt(i);
+      if (inQuotes) {
+        if (c === '"') {
+          if (text.charAt(i + 1) === '"') {
+            field += '"';
+            i += 2;
+          } else {
+            inQuotes = false;
+            i += 1;
+          }
+        } else {
+          field += c;
+          i += 1;
+        }
+      } else {
+        if (c === '"') {
+          inQuotes = true;
+          i += 1;
+        } else if (c === ',') {
+          row.push(field);
+          field = "";
+          i += 1;
+        } else if (c === '\r') {
+          i += 1;
+        } else if (c === '\n') {
+          row.push(field);
+          rows.push(row);
+          row = [];
+          field = "";
+          i += 1;
+        } else {
+          field += c;
+          i += 1;
+        }
+      }
+    }
+    row.push(field);
+    rows.push(row);
+    return rows;
+  }
+
+  function parseCsvToWords(text) {
+    var rows = parseCsv(text);
+    if (rows.length === 0) { return []; }
+    var result = [];
+    // 第一行是表头(单词、假名、词性...),按 NOTEBOOK_CSV_FIELDS 固定列顺序位置映射,不依赖表头文字
+    for (var i = 1; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.length === 1 && r[0] === "") { continue; }
+      var obj = {};
+      for (var j = 0; j < NOTEBOOK_CSV_FIELDS.length; j++) {
+        obj[NOTEBOOK_CSV_FIELDS[j]] = r[j] !== undefined ? r[j] : "";
+      }
+      result.push(obj);
+    }
+    return result;
+  }
+
+  // ==== 顶部栏更新 ====
+  function updateTopBarForView() {
+    var titleEl = document.getElementById("categoryTitle");
+    var actionBtn = document.getElementById("actionBtn");
+    if (currentView === "category") {
+      titleEl.textContent = currentCategoryName;
+      actionBtn.textContent = "+";
+    } else {
+      titleEl.textContent = "生词本";
+      actionBtn.textContent = "−";
+    }
+  }
+
+  function getCurrentDeck() {
+    return currentView === "category" ? deck : notebookDeck;
+  }
+
+  // ==== 渲染当前词 ====
+  function renderCurrent() {
+    var progressEl = document.getElementById("progressLabel");
+    var wrap = document.getElementById("contentWrap");
+
+    if (currentView === "notebook" && notebookLoadState === "loading") {
+      progressEl.textContent = "";
+      wrap.innerHTML = "";
+      var loadingDiv = document.createElement("div");
+      loadingDiv.className = "loading-state";
+      loadingDiv.textContent = "加载中...";
+      wrap.appendChild(loadingDiv);
+      return;
+    }
+
+    if (currentView === "notebook" && notebookLoadState === "error") {
+      progressEl.textContent = "";
+      wrap.innerHTML = "";
+      var errDiv = document.createElement("div");
+      errDiv.className = "empty-state";
+      errDiv.textContent = "生词本加载失败,请检查网络";
+      wrap.appendChild(errDiv);
+      return;
+    }
+
+    var list = getCurrentDeck();
+
+    if (list.length === 0) {
+      progressEl.textContent = "";
+      wrap.innerHTML = "";
+      var emptyDiv = document.createElement("div");
+      emptyDiv.className = "empty-state";
+      emptyDiv.textContent = currentView === "notebook" ? "生词本是空的" : "该类目暂无词条";
+      wrap.appendChild(emptyDiv);
+      return;
+    }
+
+    if (currentIndex >= list.length) { currentIndex = list.length - 1; }
+    if (currentIndex < 0) { currentIndex = 0; }
+
+    var item = list[currentIndex];
+    progressEl.textContent = (currentIndex + 1) + " / " + list.length;
+
+    wrap.innerHTML = "";
+    wrap.appendChild(buildTextEl(item.word, "word-main"));
+    wrap.appendChild(buildTextEl(item.kana, "word-kana"));
+    wrap.appendChild(buildTextEl(item.pos, "word-pos"));
+    wrap.appendChild(buildDivider());
+
+    appendFieldBlock(wrap, "我的记忆法", item.mnemonic);
+    wrap.appendChild(buildDivider());
+    appendFieldBlock(wrap, "中文释义", item.meaning_cn);
+    appendFieldBlock(wrap, "例句(日)", item.example_jp);
+    appendFieldBlock(wrap, "例句(中)", item.example_cn);
+    appendFieldBlock(wrap, "考点", item.jlpt_point);
+  }
+
+  function buildTextEl(text, cls) {
+    var div = document.createElement("div");
+    div.className = cls;
+    div.textContent = text || "";
+    return div;
+  }
+
+  function buildDivider() {
+    var div = document.createElement("div");
+    div.className = "divider";
+    return div;
+  }
+
+  function appendFieldBlock(wrap, label, value) {
+    if (value === undefined || value === null || value === "") { return; }
+    var block = document.createElement("div");
+    block.className = "field-block";
+    var labelEl = document.createElement("span");
+    labelEl.className = "field-label";
+    labelEl.textContent = label;
+    var valueEl = document.createElement("span");
+    valueEl.className = "field-value";
+    valueEl.textContent = value;
+    block.appendChild(labelEl);
+    block.appendChild(valueEl);
+    wrap.appendChild(block);
+  }
+
+  // ==== 黑屏硬切换 ====
+  function withBlackout(updateFn) {
+    var blackout = document.getElementById("blackout");
+    blackout.style.display = "block";
+    setTimeout(function () {
+      updateFn();
+      blackout.style.display = "none";
+    }, 200);
+  }
+
+  function handleNext() {
+    var list = getCurrentDeck();
+    if (list.length === 0) { return; }
+    withBlackout(function () {
+      currentIndex = (currentIndex + 1) % list.length;
+      renderCurrent();
+    });
+  }
+
+  function handlePrev() {
+    var list = getCurrentDeck();
+    if (list.length === 0) { return; }
+    withBlackout(function () {
+      currentIndex = (currentIndex - 1 + list.length) % list.length;
+      renderCurrent();
+    });
+  }
+
+  function handleShuffle() {
+    var list = getCurrentDeck();
+    if (list.length === 0) { return; }
+    withBlackout(function () {
+      fisherYatesShuffle(list);
+      currentIndex = 0;
+      renderCurrent();
+    });
+  }
+
+  function fisherYatesShuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp;
+    }
+  }
+
+  // ==== 自动播放 ====
+  function startAutoPlay() {
+    if (autoPlayTimer) { return; }
+    var input = document.getElementById("intervalInput");
+    var seconds = parseFloat(input.value);
+    if (!seconds || seconds < 1) { seconds = 5; }
+    autoPlayTimer = setInterval(function () {
+      var list = getCurrentDeck();
+      if (list.length === 0) { return; }
+      withBlackout(function () {
+        currentIndex = (currentIndex + 1) % list.length;
+        renderCurrent();
+      });
+    }, seconds * 1000);
+    document.getElementById("playBtn").disabled = true;
+    document.getElementById("pauseBtn").disabled = false;
+  }
+
+  function pauseAutoPlay() {
+    stopAutoPlayInternal();
+  }
+
+  function stopAutoPlayInternal() {
+    if (autoPlayTimer) {
+      clearInterval(autoPlayTimer);
+      autoPlayTimer = null;
+    }
+    document.getElementById("playBtn").disabled = false;
+    document.getElementById("pauseBtn").disabled = true;
+  }
+
+  // ==== 状态提示 ====
+  function showStatus(msg) {
+    var el = document.getElementById("statusMsg");
+    el.textContent = msg;
+    if (statusTimer) { clearTimeout(statusTimer); }
+    if (msg) {
+      statusTimer = setTimeout(function () { el.textContent = ""; }, 2500);
+    }
+  }
+
+  // ==== 顶部 +/- 按钮 ====
+  function onActionBtnClick() {
+    if (currentView === "category") {
+      addToNotebook();
+    } else {
+      removeFromNotebookCurrent();
+    }
+  }
+
+  function addToNotebook() {
+    if (deck.length === 0) { return; }
+    var item = deck[currentIndex];
+    var payloadWord = {
+      word: item.word,
+      kana: item.kana,
+      pos: item.pos,
+      mnemonic: item.mnemonic || "",
+      meaning_cn: item.meaning_cn,
+      example_jp: item.example_jp,
+      example_cn: item.example_cn,
+      jlpt_point: item.jlpt_point || "",
+      source_category: currentCategoryName
+    };
+    showStatus("已添加");
+    sendNotebookRequest("add", payloadWord);
+  }
+
+  function removeFromNotebookCurrent() {
+    if (notebookDeck.length === 0) { return; }
+    var item = notebookDeck[currentIndex];
+    var wordName = item.word;
+    showStatus("已移除");
+    notebookDeck.splice(currentIndex, 1);
+    if (currentIndex >= notebookDeck.length) { currentIndex = 0; }
+    renderCurrent();
+    sendNotebookRequest("remove", { word: wordName });
+  }
+
+  // ==== 云端写入(带失败兜底队列) ====
+  function sendNotebookRequest(action, wordPayload) {
+    var body = JSON.stringify({
+      secret: NOTEBOOK_SECRET,
+      action: action,
+      word: wordPayload
+    });
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", NOTEBOOK_WRITE_URL, true);
+      xhr.setRequestHeader("Content-Type", "text/plain;charset=utf-8");
+      xhr.timeout = 8000;
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          if (xhr.status < 200 || xhr.status >= 300) {
+            queuePendingSync(action, wordPayload);
+            return;
+          }
+          if (!isSuccessResponseBody(xhr.responseText)) {
+            queuePendingSync(action, wordPayload);
+          }
+        }
+      };
+      xhr.onerror = function () {
+        queuePendingSync(action, wordPayload);
+      };
+      xhr.ontimeout = function () {
+        queuePendingSync(action, wordPayload);
+      };
+      xhr.send(body);
+    } catch (e) {
+      queuePendingSync(action, wordPayload);
+    }
+  }
+
+  // HTTP 状态是 2xx 时,仍需看响应体判断 Apps Script 端是否真的成功
+  // 已确认的实际响应格式:{"status":"added"} / {"status":"already_exists"} 为成功,{"error":"unauthorized"} 为失败
+  function isSuccessResponseBody(text) {
+    if (!text) { return true; }
+    try {
+      var obj = JSON.parse(text);
+      if (obj && obj.success === false) { return false; }
+      if (obj && obj.ok === false) { return false; }
+      if (obj && obj.error) { return false; }
+      return true;
+    } catch (e) {
+      if (/unauthorized|error|fail/i.test(text)) { return false; }
+      return true;
+    }
+  }
+
+  function getPendingQueue() {
+    try {
+      var raw = localStorage.getItem(PENDING_QUEUE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function queuePendingSync(action, wordPayload) {
+    var queue = getPendingQueue();
+    queue.push({ action: action, word: wordPayload });
+    try {
+      localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(queue));
+    } catch (e) {}
+  }
+
+  function retryPendingSync() {
+    var queue = getPendingQueue();
+    if (queue.length === 0) { return; }
+    try { localStorage.removeItem(PENDING_QUEUE_KEY); } catch (e) {}
+    for (var i = 0; i < queue.length; i++) {
+      sendNotebookRequest(queue[i].action, queue[i].word);
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
