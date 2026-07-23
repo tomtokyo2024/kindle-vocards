@@ -300,25 +300,14 @@
   var NOTEBOOK_READ_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=0&single=true&output=csv";
   var NOTEBOOK_SECRET = "vocab2026xyz"; // 我会自己手动替换成真实密钥,不要改动这行的位置,方便我查找替换
 
-  // ==== Mock 数据(未来会替换为 Google Sheets 数据源,字段名需保持一致) ====
-  var CATEGORIES = {
-    "红薯老师词": [
-      { word: "覆る", kana: "くつがえる", pos: "自动词", meaning_cn: "被推翻,颠覆", example_jp: "判決が覆った。", example_cn: "判决被推翻了。", mnemonic: "鞋子倒反了!" },
-      { word: "曖昧", kana: "あいまい", pos: "形容动词", meaning_cn: "暧昧,模糊不清", example_jp: "彼の返事は曖昧だった。", example_cn: "他的回答很暧昧。", mnemonic: "暧昧的关系让人看不清楚。" },
-      { word: "潔い", kana: "いさぎよい", pos: "形容词", meaning_cn: "干脆,果断,光明磊落", example_jp: "彼は潔く負けを認めた。", example_cn: "他干脆地承认了失败。", mnemonic: "洁净的人做事很干脆。" },
-      { word: "培う", kana: "つちかう", pos: "他动词", meaning_cn: "培养,培育", example_jp: "経験を培う。", example_cn: "培养经验。", mnemonic: "土里栽培的植物需要培养。" },
-      { word: "妨げる", kana: "さまたげる", pos: "他动词", meaning_cn: "妨碍,阻碍", example_jp: "工事が交通を妨げている。", example_cn: "施工妨碍了交通。", mnemonic: "女字旁,像有人挡在路中间。" },
-      { word: "貫く", kana: "つらぬく", pos: "他动词", meaning_cn: "贯穿,贯彻", example_jp: "初志を貫く。", example_cn: "贯彻初心。", mnemonic: "一根线贯穿始终。" }
-    ],
-    "特色记忆法则": [
-      { word: "曙", kana: "あけぼの", pos: "名词", meaning_cn: "黎明,曙光", example_jp: "新時代の曙。", example_cn: "新时代的曙光。", mnemonic: "日出的样子,曙光初现。" },
-      { word: "戸惑う", kana: "とまどう", pos: "自动词", meaning_cn: "困惑,不知所措", example_jp: "急な質問に戸惑った。", example_cn: "对突然的提问感到困惑。", mnemonic: "门户之间迷了路,不知所措。" },
-      { word: "揺るぎない", kana: "ゆるぎない", pos: "形容词", meaning_cn: "坚定不移的", example_jp: "揺るぎない信念を持つ。", example_cn: "拥有坚定不移的信念。", mnemonic: "不会摇晃(揺る)的信念。" },
-      { word: "紛れる", kana: "まぎれる", pos: "自动词", meaning_cn: "混杂,混入", example_jp: "人混みに紛れる。", example_cn: "混入人群中。", mnemonic: "丝线纠缠不清,混杂在一起。" },
-      { word: "凝る", kana: "こる", pos: "自动词", meaning_cn: "热衷,酸痛,讲究", example_jp: "肩が凝る。", example_cn: "肩膀酸痛。", mnemonic: "冰(冫)冻住了,肩膀僵硬酸痛。" },
-      { word: "煩わしい", kana: "わずらわしい", pos: "形容词", meaning_cn: "麻烦的,繁琐的", example_jp: "手続きが煩わしい。", example_cn: "手续很繁琐。", mnemonic: "两个火(炎)加页,烦躁又麻烦。" }
-    ]
+  // ==== 类目数据源:每个类目对应一个 Google Sheets 发布的 CSV 链接 ====
+  // 以后新增类目,只需要在这里加一行 "类目名": "csv链接",不用改任何渲染逻辑
+  var CATEGORY_SOURCES = {
+    "特色记忆法则": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=80857184&single=true&output=csv"
   };
+
+  // 类目 CSV 列的固定顺序:单词、假名、词性、我的记忆法、中文释义、日文例句、例句中文翻译、JLPT考点
+  var CATEGORY_CSV_FIELDS = ["word", "kana", "pos", "mnemonic", "meaning_cn", "example_jp", "example_cn", "jlpt_point"];
 
   var PENDING_QUEUE_KEY = "vocab_pending_sync";
 
@@ -329,6 +318,9 @@
   var currentView = "category"; // "category" | "notebook"
   var currentCategoryName = null;
   var deck = [];
+  var categoryCache = {}; // 类目名 -> 已经 fetch + 解析好的词条数组,同一次会话内避免重复请求
+  var categoryLoadState = "idle"; // idle | loading | loaded | error
+  var categoryRequestToken = 0;
   var notebookDeck = [];
   var notebookLoadState = "idle"; // idle | loading | loaded | error
   var notebookRequestToken = 0;
@@ -339,7 +331,7 @@
   // ==== 初始化 ====
   function init() {
     buildPanel();
-    var firstCategory = Object.keys(CATEGORIES)[0];
+    var firstCategory = Object.keys(CATEGORY_SOURCES)[0];
     loadCategory(firstCategory);
     retryPendingSync();
   }
@@ -354,7 +346,7 @@
     nbBtn.onclick = function () { selectNotebook(); };
     panelList.appendChild(nbBtn);
 
-    var keys = Object.keys(CATEGORIES);
+    var keys = Object.keys(CATEGORY_SOURCES);
     for (var i = 0; i < keys.length; i++) {
       var catName = keys[i];
       var btn = document.createElement("button");
@@ -393,24 +385,61 @@
     stopAutoPlayInternal();
     currentView = "category";
     currentCategoryName = catName;
-    deck = [];
-    var src = CATEGORIES[catName];
-    for (var i = 0; i < src.length; i++) {
-      deck.push(cloneWord(src[i]));
-    }
     currentIndex = 0;
     updateTopBarForView();
+
+    if (Object.prototype.hasOwnProperty.call(categoryCache, catName)) {
+      deck = categoryCache[catName];
+      categoryLoadState = "loaded";
+      renderCurrent();
+      return;
+    }
+
+    categoryLoadState = "loading";
+    deck = [];
     renderCurrent();
+    fetchCategoryCsv(catName);
   }
 
-  function cloneWord(w) {
-    var out = {};
-    for (var k in w) {
-      if (Object.prototype.hasOwnProperty.call(w, k)) {
-        out[k] = w[k];
-      }
+  function fetchCategoryCsv(catName) {
+    categoryRequestToken = categoryRequestToken + 1;
+    var myToken = categoryRequestToken;
+    var url = CATEGORY_SOURCES[catName];
+    var xhr = new XMLHttpRequest();
+    try {
+      xhr.open("GET", url, true);
+      xhr.timeout = 8000;
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          if (myToken !== categoryRequestToken) { return; }
+          if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
+            categoryCache[catName] = parseCsvToWords(xhr.responseText, CATEGORY_CSV_FIELDS);
+            deck = categoryCache[catName];
+            categoryLoadState = "loaded";
+          } else {
+            categoryLoadState = "error";
+          }
+          if (currentView === "category" && currentCategoryName === catName) {
+            currentIndex = 0;
+            renderCurrent();
+          }
+        }
+      };
+      xhr.onerror = function () {
+        if (myToken !== categoryRequestToken) { return; }
+        categoryLoadState = "error";
+        if (currentView === "category" && currentCategoryName === catName) { renderCurrent(); }
+      };
+      xhr.ontimeout = function () {
+        if (myToken !== categoryRequestToken) { return; }
+        categoryLoadState = "error";
+        if (currentView === "category" && currentCategoryName === catName) { renderCurrent(); }
+      };
+      xhr.send();
+    } catch (e) {
+      categoryLoadState = "error";
+      renderCurrent();
     }
-    return out;
   }
 
   // ==== 生词本视图 ====
@@ -435,7 +464,7 @@
         if (xhr.readyState === 4) {
           if (myToken !== notebookRequestToken) { return; }
           if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
-            notebookDeck = parseCsvToWords(xhr.responseText);
+            notebookDeck = parseCsvToWords(xhr.responseText, NOTEBOOK_CSV_FIELDS);
             notebookLoadState = "loaded";
           } else {
             notebookLoadState = "error";
@@ -513,17 +542,18 @@
     return rows;
   }
 
-  function parseCsvToWords(text) {
+  // 通用 CSV -> 词条对象数组:按传入的 fields 固定列顺序位置映射,不依赖表头文字。
+  // 类目视图和生词本视图共用这一个函数,分别传各自的字段顺序数组。
+  function parseCsvToWords(text, fields) {
     var rows = parseCsv(text);
     if (rows.length === 0) { return []; }
     var result = [];
-    // 第一行是表头(单词、假名、词性...),按 NOTEBOOK_CSV_FIELDS 固定列顺序位置映射,不依赖表头文字
     for (var i = 1; i < rows.length; i++) {
       var r = rows[i];
       if (r.length === 1 && r[0] === "") { continue; }
       var obj = {};
-      for (var j = 0; j < NOTEBOOK_CSV_FIELDS.length; j++) {
-        obj[NOTEBOOK_CSV_FIELDS[j]] = r[j] !== undefined ? r[j] : "";
+      for (var j = 0; j < fields.length; j++) {
+        obj[fields[j]] = r[j] !== undefined ? r[j] : "";
       }
       result.push(obj);
     }
@@ -551,6 +581,26 @@
   function renderCurrent() {
     var progressEl = document.getElementById("progressLabel");
     var wrap = document.getElementById("contentWrap");
+
+    if (currentView === "category" && categoryLoadState === "loading") {
+      progressEl.textContent = "";
+      wrap.innerHTML = "";
+      var catLoadingDiv = document.createElement("div");
+      catLoadingDiv.className = "loading-state";
+      catLoadingDiv.textContent = "加载中...";
+      wrap.appendChild(catLoadingDiv);
+      return;
+    }
+
+    if (currentView === "category" && categoryLoadState === "error") {
+      progressEl.textContent = "";
+      wrap.innerHTML = "";
+      var catErrDiv = document.createElement("div");
+      catErrDiv.className = "empty-state";
+      catErrDiv.textContent = "该类目加载失败,请检查网络";
+      wrap.appendChild(catErrDiv);
+      return;
+    }
 
     if (currentView === "notebook" && notebookLoadState === "loading") {
       progressEl.textContent = "";
