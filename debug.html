@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>诊断页</title>
+<style>
+  body { font-family: sans-serif; font-size: 20px; padding: 20px; color: #000000; background: #ffffff; }
+  h3 { font-size: 22px; }
+  a { font-size: 20px; }
+  #result, #result2 { white-space: pre-wrap; word-wrap: break-word; border: 1px solid #000000; padding: 10px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h3>测试 1:直接点击链接跳转打开 CSV(整页导航,不经过 JS)</h3>
+<p><a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=80857184&single=true&output=csv">点击打开类目 CSV 链接</a></p>
+<p>点开后如果看到一堆逗号分隔的文字(单词,假名,词性...),说明这条路是通的。如果报错或空白,把错误信息记下来。</p>
+
+<h3>测试 2:类目 CSV 的 XHR 请求结果(和 App 用的同一种方式)</h3>
+<div id="result">测试中...</div>
+
+<h3>测试 3:生词本 CSV 的 XHR 请求结果</h3>
+<div id="result2">测试中...</div>
+
+<script>
+  function runTest(url, outId) {
+    var out = document.getElementById(outId);
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", url, true);
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          var msg = "readyState=" + xhr.readyState +
+            "\nstatus=" + xhr.status +
+            "\nstatusText=" + xhr.statusText +
+            "\nresponseLength=" + (xhr.responseText ? xhr.responseText.length : 0) +
+            "\nresponsePreview=" + (xhr.responseText ? xhr.responseText.substring(0, 80) : "(空)");
+          out.textContent = msg;
+        }
+      };
+      xhr.onerror = function () {
+        out.textContent = "onerror 触发:网络层面直接失败(常见于 CORS 被拒绝或跨域重定向失败)";
+      };
+      xhr.send();
+    } catch (e) {
+      out.textContent = "抛出异常:" + e.message;
+    }
+  }
+
+  runTest("https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=80857184&single=true&output=csv", "result");
+  runTest("https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=0&single=true&output=csv", "result2");
+</script>
+
+</body>
+</html>
