@@ -16,8 +16,8 @@
   }
 
   body {
-    padding-top: 116px;
-    padding-bottom: 160px;
+    padding-top: 56px;
+    padding-bottom: 30px;
   }
 
   /* ---- 顶部导航栏 ---- */
@@ -32,32 +32,6 @@
     z-index: 100;
   }
 
-  /* ---- 顶部翻页栏(前へ/次へ 从底部移到这里,避免底部固定栏在 Kindle 上跟随滚动导致点不到) ---- */
-  #pageNavBar {
-    position: fixed;
-    top: 56px;
-    left: 0;
-    width: 100%;
-    height: 60px;
-    background: #ffffff;
-    border-bottom: 1px solid #000000;
-    z-index: 99;
-  }
-
-  #prevBtnTop, #nextBtnTop {
-    position: absolute;
-    top: 10px;
-    height: 40px;
-    padding: 0 18px;
-    font-size: 22px;
-    background: #ffffff;
-    color: #000000;
-    border: 1px solid #000000;
-  }
-
-  #prevBtnTop { left: 12px; }
-  #nextBtnTop { right: 12px; }
-
   #menuBtn, #actionBtn {
     position: absolute;
     top: 0;
@@ -65,21 +39,21 @@
     width: 56px;
     background: #ffffff;
     border: none;
-    font-size: 42px;
+    font-size: 21px;
     line-height: 56px;
     padding: 0;
     text-align: center;
   }
 
   #menuBtn { left: 12px; }
-  #actionBtn { right: 12px; font-size: 46px; }
+  #actionBtn { right: 12px; font-size: 23px; }
 
   #categoryTitle {
     display: block;
     width: 100%;
     text-align: center;
     line-height: 56px;
-    font-size: 27px;
+    font-size: 13.5px;
     font-weight: bold;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -166,11 +140,29 @@
     margin-bottom: 6px;
   }
 
+  /* 前へ/次へ 挂在单词这一行的左右两侧,不用单独占一条栏,且随卡片内容一起滚动(不依赖 position:fixed) */
+  .word-row {
+    width: 100%;
+    overflow: hidden;
+    margin: 12px 0 6px 0;
+  }
+
+  .nav-btn-inline {
+    margin-top: 10px;
+    padding: 8px 14px;
+    font-size: 22px;
+    background: #ffffff;
+    color: #000000;
+    border: 1px solid #000000;
+  }
+
+  #prevBtnTop { float: left; }
+  #nextBtnTop { float: right; }
+
   .word-main {
     text-align: center;
     font-size: 57px;
     font-weight: bold;
-    margin: 12px 0 6px 0;
     word-wrap: break-word;
   }
 
@@ -222,16 +214,15 @@
     font-size: 22.5px;
   }
 
-  /* ---- 底部控制栏 ---- */
+  /* ---- 底部控制栏 ----
+     Kindle 老浏览器实测 position:fixed 在滚动时不会吸住(会跟着内容一起滑走),
+     与其伪装成吸底、行为却不可靠,不如老老实实放在文档正常流里,跟着卡片内容一起滚动,位置可预期。 */
   #bottomBar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
     width: 100%;
     background: #ffffff;
     border-top: 1px solid #000000;
-    z-index: 100;
     padding: 8px 0;
+    margin-top: 20px;
   }
 
   .bottom-row {
@@ -256,7 +247,7 @@
   }
 
   #intervalInput {
-    width: 50px;
+    width: 90px;
     padding: 8px 4px;
     font-size: 22.5px;
     border: 1px solid #000000;
@@ -292,11 +283,6 @@
   <button id="menuBtn" onclick="openPanel()">&#9776;</button>
   <span id="categoryTitle"></span>
   <button id="actionBtn" onclick="onActionBtnClick()">+</button>
-</div>
-
-<div id="pageNavBar">
-  <button id="prevBtnTop" onclick="handlePrev()">前へ</button>
-  <button id="nextBtnTop" onclick="handleNext()">次へ</button>
 </div>
 
 <div id="clickCatcher" onclick="closePanel()"></div>
@@ -614,6 +600,8 @@
 
   // ==== 渲染当前词 ====
   function renderCurrent() {
+    window.scrollTo(0, 0);
+
     var progressEl = document.getElementById("progressLabel");
     var wrap = document.getElementById("contentWrap");
 
@@ -676,7 +664,7 @@
     progressEl.textContent = (currentIndex + 1) + " / " + list.length;
 
     wrap.innerHTML = "";
-    wrap.appendChild(buildTextEl(item.word, "word-main"));
+    wrap.appendChild(buildWordRow(item.word));
     wrap.appendChild(buildTextEl(item.kana, "word-kana"));
     wrap.appendChild(buildTextEl(item.pos, "word-pos"));
     wrap.appendChild(buildDivider());
@@ -694,6 +682,33 @@
     div.className = cls;
     div.textContent = text || "";
     return div;
+  }
+
+  // 单词这一行:前へ/次へ 分别浮动在左右两侧,单词本体居中显示在中间剩余空间里
+  function buildWordRow(wordText) {
+    var row = document.createElement("div");
+    row.className = "word-row";
+
+    var prevBtn = document.createElement("button");
+    prevBtn.id = "prevBtnTop";
+    prevBtn.className = "nav-btn-inline";
+    prevBtn.textContent = "前へ";
+    prevBtn.onclick = handlePrev;
+    row.appendChild(prevBtn);
+
+    var nextBtn = document.createElement("button");
+    nextBtn.id = "nextBtnTop";
+    nextBtn.className = "nav-btn-inline";
+    nextBtn.textContent = "次へ";
+    nextBtn.onclick = handleNext;
+    row.appendChild(nextBtn);
+
+    var wordEl = document.createElement("div");
+    wordEl.className = "word-main";
+    wordEl.textContent = wordText || "";
+    row.appendChild(wordEl);
+
+    return row;
   }
 
   function buildDivider() {
