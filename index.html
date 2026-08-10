@@ -141,24 +141,14 @@
   .word-row {
     position: relative;
     width: 100%;
-    overflow: hidden;
+    overflow: visible;
     margin: 4px 0 4px 0;
-    padding-top: 60px; /* 给右上角的 + 按钮留出独立一行的空间 */
   }
 
-  /* 单词右上角的添加/移除按钮,比原来放大约20%,方便点击 */
-  .corner-action-btn {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 67px;
-    height: 56px;
-    font-size: 28px;
-    line-height: 56px;
-    background: #ffffff;
-    border: none;
-    padding: 0;
-    text-align: center;
+  .word-row::after {
+    content: "";
+    display: table;
+    clear: both;
   }
 
   .nav-btn-inline {
@@ -189,10 +179,34 @@
     word-wrap: break-word;
   }
 
+  /* 假名读音的定位容器,+按钮以它的右上角为锚点 */
+  .word-kana-wrap {
+    position: relative;
+    display: inline-block;
+  }
+
   .word-kana-inline {
     text-align: center;
     font-size: 32px;
     color: #000000;
+  }
+
+  /* 添加/移除按钮:黑底白字圆形,锚定在假名读音的右上角 */
+  .corner-action-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: #000000;
+    color: #ffffff;
+    font-size: 34px;
+    line-height: 76px;
+    border: none;
+    padding: 0;
+    text-align: center;
   }
 
   .word-pos {
@@ -716,18 +730,11 @@
     return div;
   }
 
-  // 单词这一行:前へ/次へ 分别浮动在左右两侧,+/− 按钮挂在右上角独立一行,
-  // 汉字和假名读音合并在同一行居中显示,减少纵向占用空间。
+  // 单词这一行:前へ/次へ 分别浮动在左右两侧,汉字和假名读音合并在同一行居中显示,
+  // +/− 按钮挂在假名读音的右上角(黑底白字圆形),随假名位置一起移动。
   function buildWordRow(wordText, kanaText) {
     var row = document.createElement("div");
     row.className = "word-row";
-
-    var actionBtn = document.createElement("button");
-    actionBtn.id = "actionBtn";
-    actionBtn.className = "corner-action-btn";
-    actionBtn.textContent = currentActionLabel;
-    actionBtn.onclick = onActionBtnClick;
-    row.appendChild(actionBtn);
 
     var prevBtn = document.createElement("button");
     prevBtn.id = "prevBtnTop";
@@ -751,11 +758,22 @@
     wordEl.textContent = wordText || "";
     wordLine.appendChild(wordEl);
 
+    var kanaWrap = document.createElement("span");
+    kanaWrap.className = "word-kana-wrap";
+
     var kanaEl = document.createElement("span");
     kanaEl.className = "word-kana-inline";
     kanaEl.textContent = kanaText || "";
-    wordLine.appendChild(kanaEl);
+    kanaWrap.appendChild(kanaEl);
 
+    var actionBtn = document.createElement("button");
+    actionBtn.id = "actionBtn";
+    actionBtn.className = "corner-action-btn";
+    actionBtn.textContent = currentActionLabel;
+    actionBtn.onclick = onActionBtnClick;
+    kanaWrap.appendChild(actionBtn);
+
+    wordLine.appendChild(kanaWrap);
     row.appendChild(wordLine);
 
     return row;
