@@ -163,17 +163,15 @@
   #prevBtnTop { float: left; }
   #nextBtnTop { float: right; }
 
-  /* 汉字和假名读音放在同一行,减少纵向占用空间 */
+  /* 汉字和假名读音放在同一行,减少纵向占用空间。
+     用 text-align:center + inline-block 而不是 flex,老版 Kindle 浏览器对 flex 居中支持不可靠。 */
   .word-line {
-    display: flex;
-    justify-content: center;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 14px;
+    text-align: center;
   }
 
   .word-main {
-    text-align: center;
+    display: inline-block;
+    vertical-align: baseline;
     font-size: 57px;
     font-weight: bold;
     word-wrap: break-word;
@@ -183,26 +181,28 @@
   .word-kana-wrap {
     position: relative;
     display: inline-block;
+    vertical-align: baseline;
+    margin-left: 14px;
   }
 
   .word-kana-inline {
-    text-align: center;
     font-size: 32px;
     color: #000000;
   }
 
-  /* 添加/移除按钮:黑底白字圆形,贴在假名读音右上角外侧,留出间距不遮挡文字 */
+  /* 添加/移除按钮:黑底白字圆形,贴在假名读音右上角外侧,留出间距不遮挡文字。
+     圆形比上一版缩小约30%,但加号字号相对更大更醒目。 */
   .corner-action-btn {
     position: absolute;
-    top: -12px;
-    right: -64px;
-    width: 52px;
-    height: 52px;
+    top: -10px;
+    right: -46px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: #000000;
     color: #ffffff;
-    font-size: 26px;
-    line-height: 52px;
+    font-size: 24px;
+    line-height: 36px;
     border: none;
     padding: 0;
     text-align: center;
