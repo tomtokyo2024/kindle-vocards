@@ -28,13 +28,13 @@
     width: 100%;
     height: 56px;
     background: #ffffff;
-    border-bottom: 1px solid #000000;
     z-index: 100;
   }
 
-  #menuBtn, #actionBtn {
+  #menuBtn {
     position: absolute;
     top: 0;
+    left: 12px;
     height: 56px;
     width: 56px;
     background: #ffffff;
@@ -44,9 +44,6 @@
     padding: 0;
     text-align: center;
   }
-
-  #menuBtn { left: 12px; }
-  #actionBtn { right: 12px; font-size: 23px; }
 
   #categoryTitle {
     display: block;
@@ -122,7 +119,7 @@
   #cardArea {
     width: 90%;
     margin: 0 auto;
-    padding: 16px 0;
+    padding: 8px 0;
   }
 
   #progressLabel {
@@ -142,9 +139,26 @@
 
   /* 前へ/次へ 挂在单词这一行的左右两侧,不用单独占一条栏,且随卡片内容一起滚动(不依赖 position:fixed) */
   .word-row {
+    position: relative;
     width: 100%;
     overflow: hidden;
-    margin: 12px 0 6px 0;
+    margin: 4px 0 4px 0;
+    padding-top: 60px; /* 给右上角的 + 按钮留出独立一行的空间 */
+  }
+
+  /* 单词右上角的添加/移除按钮,比原来放大约20%,方便点击 */
+  .corner-action-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 67px;
+    height: 56px;
+    font-size: 28px;
+    line-height: 56px;
+    background: #ffffff;
+    border: none;
+    padding: 0;
+    text-align: center;
   }
 
   .nav-btn-inline {
@@ -159,6 +173,15 @@
   #prevBtnTop { float: left; }
   #nextBtnTop { float: right; }
 
+  /* 汉字和假名读音放在同一行,减少纵向占用空间 */
+  .word-line {
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
   .word-main {
     text-align: center;
     font-size: 57px;
@@ -166,11 +189,10 @@
     word-wrap: break-word;
   }
 
-  .word-kana {
+  .word-kana-inline {
     text-align: center;
-    font-size: 40.5px;
+    font-size: 32px;
     color: #000000;
-    margin-bottom: 4px;
   }
 
   .word-pos {
@@ -185,12 +207,12 @@
     width: 100%;
     height: 1px;
     background: #000000;
-    margin: 18px 0;
+    margin: 12px 0;
   }
 
   .field-block {
     text-align: center;
-    margin: 16px 0;
+    margin: 12px 0;
   }
 
   .field-label {
@@ -246,6 +268,13 @@
     border-color: #aaaaaa;
   }
 
+  /* 自动播放进行中:反色为黑底白字,提示当前处于播放状态 */
+  #playBtn.active {
+    background: #000000 !important;
+    color: #ffffff !important;
+    border-color: #000000 !important;
+  }
+
   #intervalInput {
     width: 90px;
     padding: 8px 4px;
@@ -282,7 +311,6 @@
 <div id="topBar">
   <button id="menuBtn" onclick="openPanel()">&#9776;</button>
   <span id="categoryTitle"></span>
-  <button id="actionBtn" onclick="onActionBtnClick()">+</button>
 </div>
 
 <div id="clickCatcher" onclick="closePanel()"></div>
@@ -583,16 +611,21 @@
   }
 
   // ==== 顶部栏更新 ====
+  // actionBtn 现在挂在单词行右上角,是随 renderCurrent 动态创建的,这里先记下应显示的文字,
+  // 等 buildWordRow 创建按钮时再取用;如果按钮当前已存在(比如切换生词本/类目时)也顺手同步一下。
+  var currentActionLabel = "+";
+
   function updateTopBarForView() {
     var titleEl = document.getElementById("categoryTitle");
-    var actionBtn = document.getElementById("actionBtn");
     if (currentView === "category") {
       titleEl.textContent = currentCategoryName;
-      actionBtn.textContent = "+";
+      currentActionLabel = "+";
     } else {
       titleEl.textContent = "生词本";
-      actionBtn.textContent = "−";
+      currentActionLabel = "−";
     }
+    var actionBtn = document.getElementById("actionBtn");
+    if (actionBtn) { actionBtn.textContent = currentActionLabel; }
   }
 
   function getCurrentDeck() {
@@ -665,8 +698,7 @@
     progressEl.textContent = (currentIndex + 1) + " / " + list.length;
 
     wrap.innerHTML = "";
-    wrap.appendChild(buildWordRow(item.word));
-    wrap.appendChild(buildTextEl(item.kana, "word-kana"));
+    wrap.appendChild(buildWordRow(item.word, item.kana));
     wrap.appendChild(buildTextEl(item.pos, "word-pos"));
     wrap.appendChild(buildDivider());
 
@@ -684,10 +716,18 @@
     return div;
   }
 
-  // 单词这一行:前へ/次へ 分别浮动在左右两侧,单词本体居中显示在中间剩余空间里
-  function buildWordRow(wordText) {
+  // 单词这一行:前へ/次へ 分别浮动在左右两侧,+/− 按钮挂在右上角独立一行,
+  // 汉字和假名读音合并在同一行居中显示,减少纵向占用空间。
+  function buildWordRow(wordText, kanaText) {
     var row = document.createElement("div");
     row.className = "word-row";
+
+    var actionBtn = document.createElement("button");
+    actionBtn.id = "actionBtn";
+    actionBtn.className = "corner-action-btn";
+    actionBtn.textContent = currentActionLabel;
+    actionBtn.onclick = onActionBtnClick;
+    row.appendChild(actionBtn);
 
     var prevBtn = document.createElement("button");
     prevBtn.id = "prevBtnTop";
@@ -703,10 +743,20 @@
     nextBtn.onclick = handleNext;
     row.appendChild(nextBtn);
 
-    var wordEl = document.createElement("div");
+    var wordLine = document.createElement("div");
+    wordLine.className = "word-line";
+
+    var wordEl = document.createElement("span");
     wordEl.className = "word-main";
     wordEl.textContent = wordText || "";
-    row.appendChild(wordEl);
+    wordLine.appendChild(wordEl);
+
+    var kanaEl = document.createElement("span");
+    kanaEl.className = "word-kana-inline";
+    kanaEl.textContent = kanaText || "";
+    wordLine.appendChild(kanaEl);
+
+    row.appendChild(wordLine);
 
     return row;
   }
@@ -794,6 +844,7 @@
       });
     }, seconds * 1000);
     document.getElementById("playBtn").disabled = true;
+    document.getElementById("playBtn").classList.add("active");
     document.getElementById("pauseBtn").disabled = false;
   }
 
@@ -807,6 +858,7 @@
       autoPlayTimer = null;
     }
     document.getElementById("playBtn").disabled = false;
+    document.getElementById("playBtn").classList.remove("active");
     document.getElementById("pauseBtn").disabled = true;
   }
 
