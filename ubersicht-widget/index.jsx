@@ -58,10 +58,12 @@ function csvUrl(gid) {
   );
 }
 
-// CSV 磁盘缓存:每个类目一个文件,最多每 60 分钟重拉一次,其余时间直接 cat。
+// CSV 磁盘缓存:每个类目一个文件,最多每 CACHE_MINUTES 分钟重拉一次,其余时间直接 cat。
 // curl 失败时先写 .tmp 再 mv,所以网络断了会保留旧数据而不是清空。
+// 定成 10 分钟是迁就生词本:类目词表基本不变,但生词本会随时增删,
+// 一小时的滞后太久了。三个表加起来一次约 170KB,10 分钟一次不算重。
 const CACHE_PREFIX = "/tmp/vocab-widget-cache-";
-const CACHE_MINUTES = 60;
+const CACHE_MINUTES = 10;
 
 // 所有类目一次性全部拉下来,切换类目时不需要重新请求,点一下就切。
 const DELIM = "<<<VOCAB-CAT:";
