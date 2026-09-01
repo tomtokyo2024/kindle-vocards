@@ -22,7 +22,18 @@ const POSITION = `
   right: 24px;
 `;
 
-const WIDTH = "260px";
+// ==== 1.5 整体缩放 ====
+// 下面样式里所有尺寸(宽度、内边距、字号、间距)都是按这个倍数算出来的,
+// 觉得整体太大或太小就只改这一个数字,比例保持不变。1 = 原始大小。
+const SCALE = 1.5;
+
+// 缩放前的基准宽度,实际宽度 = BASE_WIDTH * SCALE
+const BASE_WIDTH = 260;
+
+// 把基准像素值乘上 SCALE,保留一位小数够用了
+function px(n) {
+  return Math.round(n * SCALE * 10) / 10 + "px";
+}
 
 // ==== 2. 换词间隔 ====
 // 单位毫秒。30000 = 30 秒。这一行同时控制刷新周期和取词,只改这一处。
@@ -241,12 +252,12 @@ export const updateState = (event, prev) => {
 // ==== 样式 ====
 export const className = `
   ${POSITION}
-  width: ${WIDTH};
+  width: ${px(BASE_WIDTH)};
   box-sizing: border-box;
-  padding: 14px 18px 16px;
+  padding: ${px(14)} ${px(18)} ${px(16)};
   background-color: rgba(0, 0, 0, 0.7);
   color: #ffffff;
-  border-radius: 12px;
+  border-radius: ${px(12)};
   font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "PingFang SC", "Helvetica Neue", sans-serif;
   line-height: 1.45;
   word-break: break-word;
@@ -254,12 +265,12 @@ export const className = `
   .vw-tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 10px;
-    margin-bottom: 10px;
+    gap: ${px(4)} ${px(10)};
+    margin-bottom: ${px(10)};
   }
 
   .vw-tab {
-    font-size: 12px;
+    font-size: ${px(12)};
     color: rgba(255, 255, 255, 0.45);
     cursor: pointer;
   }
@@ -270,29 +281,29 @@ export const className = `
   }
 
   .vw-word {
-    font-size: 28px;
+    font-size: ${px(28)};
     font-weight: 600;
   }
 
   .vw-kana {
-    font-size: 16px;
+    font-size: ${px(16)};
     color: rgba(255, 255, 255, 0.75);
-    margin-top: 2px;
+    margin-top: ${px(2)};
   }
 
   .vw-meaning {
-    font-size: 14px;
-    margin-top: 8px;
+    font-size: ${px(14)};
+    margin-top: ${px(8)};
   }
 
   .vw-mnemonic {
-    font-size: 13px;
+    font-size: ${px(13)};
     color: rgba(255, 255, 255, 0.65);
-    margin-top: 6px;
+    margin-top: ${px(6)};
   }
 
   .vw-error {
-    font-size: 14px;
+    font-size: ${px(14)};
     color: rgba(255, 255, 255, 0.8);
   }
 `;
