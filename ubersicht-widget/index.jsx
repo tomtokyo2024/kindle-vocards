@@ -275,15 +275,23 @@ export const className = `
 
   .vw-tabs {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
     gap: ${px(4)} ${px(10)};
     margin-bottom: ${px(10)};
   }
 
+  .vw-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
   .vw-tab {
-    font-size: ${px(12)};
+    font-size: ${px(6)};
     color: rgba(255, 255, 255, 0.45);
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .vw-tab-active {
