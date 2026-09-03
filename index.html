@@ -397,12 +397,15 @@
       onError();
     };
 
+    // Apps Script 本身冷启动延迟波动很大(实测同一个 action 有时 2 秒有时 8 秒+),
+    // 类目词条数据量又比类目列表大得多,Kindle 老设备的网络/解析更慢,8 秒的超时太紧,
+    // 请求其实还在路上就被判定失败了,所以给够 25 秒余量。
     timer = setTimeout(function () {
       if (done) { return; }
       done = true;
       cleanup();
       onError();
-    }, timeoutMs || 8000);
+    }, timeoutMs || 25000);
 
     script.src = url + (url.indexOf("?") >= 0 ? "&" : "?") + "callback=" + cbName;
     document.getElementsByTagName("head")[0].appendChild(script);

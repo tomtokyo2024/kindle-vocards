@@ -13,6 +13,14 @@
 </head>
 <body>
 
+<h3>测试 6(新):类目列表 JSONP(Apps Script action=categories)</h3>
+<div id="result6" class="result">测试中...</div>
+
+<h3>测试 7(新):类目词条 JSONP(Apps Script action=words,数据量大)</h3>
+<div id="result7" class="result">测试中...</div>
+
+<hr>
+
 <h3>测试 4(新):类目 CSV,改用 gviz/tq 接口</h3>
 <div id="result4" class="result">测试中...</div>
 
@@ -61,6 +69,56 @@
 
   runTest("https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=80857184&single=true&output=csv", "result");
   runTest("https://docs.google.com/spreadsheets/d/e/2PACX-1vTryoGiJ9DOb8Pp-1PQmqnIFnI0TNExb4hHDW5YmYQzVMI08ZUDQjFOFsTk9sTrkWbS3ekINGpkG_vW/pub?gid=0&single=true&output=csv", "result2");
+
+  // 测 JSONP 请求实际耗时,判断是不是超时太短(而不是请求本身失败)
+  var jsonpDebugCounter = 0;
+  function runJsonpTest(url, outId, timeoutMs) {
+    var out = document.getElementById(outId);
+    var startTime = new Date().getTime();
+    jsonpDebugCounter += 1;
+    var cbName = "debugJsonpCb" + jsonpDebugCounter;
+    var script = document.createElement("script");
+    var done = false;
+    var timer = null;
+
+    function elapsed() {
+      return (new Date().getTime() - startTime) + "ms";
+    }
+    function cleanup() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      try { window[cbName] = null; delete window[cbName]; } catch (e) {}
+      if (script.parentNode) { script.parentNode.removeChild(script); }
+    }
+
+    window[cbName] = function (data) {
+      if (done) { return; }
+      done = true;
+      var len = data ? JSON.stringify(data).length : 0;
+      out.textContent = "成功,耗时=" + elapsed() + "\n返回数据长度=" + len +
+        "\n预览=" + JSON.stringify(data).substring(0, 150);
+      cleanup();
+    };
+    script.onerror = function () {
+      if (done) { return; }
+      done = true;
+      out.textContent = "script.onerror 触发,耗时=" + elapsed() + "(网络层直接失败,不是超时)";
+      cleanup();
+    };
+    timer = setTimeout(function () {
+      if (done) { return; }
+      done = true;
+      out.textContent = "超时(" + (timeoutMs / 1000) + "秒),耗时=" + elapsed() +
+        "\n(请求可能仍在路上,只是比设定的超时慢;也可能是响应内容导致脚本解析失败,不会触发 onerror)";
+      cleanup();
+    }, timeoutMs);
+
+    script.src = url + (url.indexOf("?") >= 0 ? "&" : "?") + "callback=" + cbName;
+    document.getElementsByTagName("head")[0].appendChild(script);
+  }
+
+  var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyGL9tXO1WBigSsMkplydjTG77r2s3VvmXL0hntnFnObSPhC-G7I57rw3Fo-uA9zOblrg/exec";
+  runJsonpTest(APPS_SCRIPT_URL + "?action=categories", "result6", 30000);
+  runJsonpTest(APPS_SCRIPT_URL + "?action=words&category=" + encodeURIComponent("红薯老师词"), "result7", 30000);
 </script>
 
 </body>
