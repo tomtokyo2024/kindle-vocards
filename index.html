@@ -363,6 +363,51 @@
 
   var PENDING_QUEUE_KEY = "vocab_pending_sync";
 
+  // ==== JSONP 工具函数 ====
+  // Apps Script 的 exec URL 对 GET/POST 请求都会先返回一个跳到 script.googleusercontent.com 的
+  // 302 跳转,Kindle 老版浏览器的 XHR 处理不了跨域跳转(和之前 CSV 发布链接的 307 问题同源)。
+  // 用 <script> 标签加载 + callback 参数绕开这个问题,浏览器对 <script src> 的跨域跳转没有限制。
+  // 要求 Apps Script 的 doGet 在检测到 ?callback= 参数时,返回 "callback名(JSON)" 的 JS 而不是纯 JSON。
+  var jsonpCounter = 0;
+
+  function jsonpRequest(url, onSuccess, onError, timeoutMs) {
+    jsonpCounter += 1;
+    var cbName = "vocabJsonpCb" + jsonpCounter;
+    var script = document.createElement("script");
+    var done = false;
+    var timer = null;
+
+    function cleanup() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      try { window[cbName] = null; delete window[cbName]; } catch (e) {}
+      if (script.parentNode) { script.parentNode.removeChild(script); }
+    }
+
+    window[cbName] = function (data) {
+      if (done) { return; }
+      done = true;
+      cleanup();
+      onSuccess(data);
+    };
+
+    script.onerror = function () {
+      if (done) { return; }
+      done = true;
+      cleanup();
+      onError();
+    };
+
+    timer = setTimeout(function () {
+      if (done) { return; }
+      done = true;
+      cleanup();
+      onError();
+    }, timeoutMs || 8000);
+
+    script.src = url + (url.indexOf("?") >= 0 ? "&" : "?") + "callback=" + cbName;
+    document.getElementsByTagName("head")[0].appendChild(script);
+  }
+
   // 生词本 CSV 列的固定顺序:单词、假名、词性、我的记忆法、中文释义、日文例句、例句中文翻译、JLPT考点、来源类目、加入时间
   var NOTEBOOK_CSV_FIELDS = ["word", "kana", "pos", "mnemonic", "meaning_cn", "example_jp", "example_cn", "jlpt_point", "source_category", "added_at"];
 
@@ -395,39 +440,18 @@
 
   function loadCategoryList() {
     categoryListState = "loading";
-    var xhr = new XMLHttpRequest();
-    try {
-      xhr.open("GET", NOTEBOOK_WRITE_URL + "?action=categories", true);
-      xhr.timeout = 8000;
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4) {
-          if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
-            try {
-              var obj = JSON.parse(xhr.responseText);
-              categoryList = (obj && obj.categories) ? obj.categories : [];
-              categoryListState = "loaded";
-            } catch (e) {
-              categoryListState = "error";
-            }
-          } else {
-            categoryListState = "error";
-          }
-          onCategoryListLoaded();
-        }
-      };
-      xhr.onerror = function () {
+    jsonpRequest(
+      NOTEBOOK_WRITE_URL + "?action=categories",
+      function (obj) {
+        categoryList = (obj && obj.categories) ? obj.categories : [];
+        categoryListState = "loaded";
+        onCategoryListLoaded();
+      },
+      function () {
         categoryListState = "error";
         onCategoryListLoaded();
-      };
-      xhr.ontimeout = function () {
-        categoryListState = "error";
-        onCategoryListLoaded();
-      };
-      xhr.send();
-    } catch (e) {
-      categoryListState = "error";
-      onCategoryListLoaded();
-    }
+      }
+    );
   }
 
   function onCategoryListLoaded() {
@@ -526,46 +550,24 @@
     categoryRequestToken = categoryRequestToken + 1;
     var myToken = categoryRequestToken;
     var url = NOTEBOOK_WRITE_URL + "?action=words&category=" + encodeURIComponent(catName);
-    var xhr = new XMLHttpRequest();
-    try {
-      xhr.open("GET", url, true);
-      xhr.timeout = 8000;
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4) {
-          if (myToken !== categoryRequestToken) { return; }
-          if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
-            try {
-              var obj = JSON.parse(xhr.responseText);
-              categoryCache[catName] = (obj && obj.words) ? obj.words : [];
-              deck = categoryCache[catName];
-              categoryLoadState = "loaded";
-            } catch (e) {
-              categoryLoadState = "error";
-            }
-          } else {
-            categoryLoadState = "error";
-          }
-          if (currentView === "category" && currentCategoryName === catName) {
-            currentIndex = 0;
-            renderCurrent();
-          }
+    jsonpRequest(
+      url,
+      function (obj) {
+        if (myToken !== categoryRequestToken) { return; }
+        categoryCache[catName] = (obj && obj.words) ? obj.words : [];
+        deck = categoryCache[catName];
+        categoryLoadState = "loaded";
+        if (currentView === "category" && currentCategoryName === catName) {
+          currentIndex = 0;
+          renderCurrent();
         }
-      };
-      xhr.onerror = function () {
+      },
+      function () {
         if (myToken !== categoryRequestToken) { return; }
         categoryLoadState = "error";
         if (currentView === "category" && currentCategoryName === catName) { renderCurrent(); }
-      };
-      xhr.ontimeout = function () {
-        if (myToken !== categoryRequestToken) { return; }
-        categoryLoadState = "error";
-        if (currentView === "category" && currentCategoryName === catName) { renderCurrent(); }
-      };
-      xhr.send();
-    } catch (e) {
-      categoryLoadState = "error";
-      renderCurrent();
-    }
+      }
+    );
   }
 
   // ==== 生词本视图 ====
