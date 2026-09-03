@@ -361,17 +361,6 @@
   var NOTEBOOK_READ_CSV_URL = "https://docs.google.com/spreadsheets/d/" + NOTEBOOK_SHEET_ID + "/gviz/tq?tqx=out:csv&gid=0";
   var NOTEBOOK_SECRET = "vocab2026xyz"; // 我会自己手动替换成真实密钥,不要改动这行的位置,方便我查找替换
 
-  // ==== 类目数据源:每个类目对应一个 Google Sheets 的 gviz/tq CSV 链接(同上,避开 publish-to-web 跳转) ====
-  // 以后新增类目,只需要在这里加一行 "类目名": "csv链接",不用改任何渲染逻辑
-  // 链接格式:https://docs.google.com/spreadsheets/d/{表格ID}/gviz/tq?tqx=out:csv&gid={分页gid}
-  var CATEGORY_SOURCES = {
-    "特色记忆法则": "https://docs.google.com/spreadsheets/d/" + NOTEBOOK_SHEET_ID + "/gviz/tq?tqx=out:csv&gid=80857184",
-    "红薯老师词": "https://docs.google.com/spreadsheets/d/" + NOTEBOOK_SHEET_ID + "/gviz/tq?tqx=out:csv&gid=1695379107"
-  };
-
-  // 类目 CSV 列的固定顺序:单词、假名、词性、我的记忆法、中文释义、日文例句、例句中文翻译、JLPT考点
-  var CATEGORY_CSV_FIELDS = ["word", "kana", "pos", "mnemonic", "meaning_cn", "example_jp", "example_cn", "jlpt_point"];
-
   var PENDING_QUEUE_KEY = "vocab_pending_sync";
 
   // 生词本 CSV 列的固定顺序:单词、假名、词性、我的记忆法、中文释义、日文例句、例句中文翻译、JLPT考点、来源类目、加入时间
@@ -381,9 +370,11 @@
   var currentView = "category"; // "category" | "notebook"
   var currentCategoryName = null;
   var deck = [];
-  var categoryCache = {}; // 类目名 -> 已经 fetch + 解析好的词条数组,同一次会话内避免重复请求
-  var categoryLoadState = "idle"; // idle | loading | loaded | error
+  var categoryCache = {}; // 类目名 -> 已经 fetch 好的词条数组,同一次会话内避免重复请求
+  var categoryLoadState = "loading"; // idle | loading | loaded | error(当前打开类目的词条加载状态)
   var categoryRequestToken = 0;
+  var categoryList = []; // 从 Apps Script ?action=categories 拿到的类目名数组
+  var categoryListState = "loading"; // loading | loaded | error(侧边栏类目列表本身的加载状态)
   var notebookDeck = [];
   var notebookLoadState = "idle"; // idle | loading | loaded | error
   var notebookRequestToken = 0;
@@ -394,9 +385,61 @@
   // ==== 初始化 ====
   function init() {
     buildPanel();
-    var firstCategory = Object.keys(CATEGORY_SOURCES)[0];
-    loadCategory(firstCategory);
+    currentView = "category";
+    currentCategoryName = null;
+    updateTopBarForView();
+    renderCurrent();
+    loadCategoryList();
     retryPendingSync();
+  }
+
+  function loadCategoryList() {
+    categoryListState = "loading";
+    var xhr = new XMLHttpRequest();
+    try {
+      xhr.open("GET", NOTEBOOK_WRITE_URL + "?action=categories", true);
+      xhr.timeout = 8000;
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
+            try {
+              var obj = JSON.parse(xhr.responseText);
+              categoryList = (obj && obj.categories) ? obj.categories : [];
+              categoryListState = "loaded";
+            } catch (e) {
+              categoryListState = "error";
+            }
+          } else {
+            categoryListState = "error";
+          }
+          onCategoryListLoaded();
+        }
+      };
+      xhr.onerror = function () {
+        categoryListState = "error";
+        onCategoryListLoaded();
+      };
+      xhr.ontimeout = function () {
+        categoryListState = "error";
+        onCategoryListLoaded();
+      };
+      xhr.send();
+    } catch (e) {
+      categoryListState = "error";
+      onCategoryListLoaded();
+    }
+  }
+
+  function onCategoryListLoaded() {
+    buildPanel();
+    if (categoryListState === "loaded" && categoryList.length > 0) {
+      loadCategory(categoryList[0]);
+    } else {
+      currentView = "category";
+      currentCategoryName = null;
+      updateTopBarForView();
+      renderCurrent();
+    }
   }
 
   function buildPanel() {
@@ -409,9 +452,24 @@
     nbBtn.onclick = function () { selectNotebook(); };
     panelList.appendChild(nbBtn);
 
-    var keys = Object.keys(CATEGORY_SOURCES);
-    for (var i = 0; i < keys.length; i++) {
-      var catName = keys[i];
+    if (categoryListState === "loading") {
+      var loadingDiv = document.createElement("div");
+      loadingDiv.className = "loading-state";
+      loadingDiv.textContent = "加载中...";
+      panelList.appendChild(loadingDiv);
+      return;
+    }
+
+    if (categoryListState === "error") {
+      var errDiv = document.createElement("div");
+      errDiv.className = "empty-state";
+      errDiv.textContent = "类目加载失败,请检查网络";
+      panelList.appendChild(errDiv);
+      return;
+    }
+
+    for (var i = 0; i < categoryList.length; i++) {
+      var catName = categoryList[i];
       var btn = document.createElement("button");
       btn.className = "panel-item";
       btn.textContent = catName;
@@ -461,13 +519,13 @@
     categoryLoadState = "loading";
     deck = [];
     renderCurrent();
-    fetchCategoryCsv(catName);
+    fetchCategoryWords(catName);
   }
 
-  function fetchCategoryCsv(catName) {
+  function fetchCategoryWords(catName) {
     categoryRequestToken = categoryRequestToken + 1;
     var myToken = categoryRequestToken;
-    var url = CATEGORY_SOURCES[catName];
+    var url = NOTEBOOK_WRITE_URL + "?action=words&category=" + encodeURIComponent(catName);
     var xhr = new XMLHttpRequest();
     try {
       xhr.open("GET", url, true);
@@ -476,9 +534,14 @@
         if (xhr.readyState === 4) {
           if (myToken !== categoryRequestToken) { return; }
           if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
-            categoryCache[catName] = parseCsvToWords(xhr.responseText, CATEGORY_CSV_FIELDS);
-            deck = categoryCache[catName];
-            categoryLoadState = "loaded";
+            try {
+              var obj = JSON.parse(xhr.responseText);
+              categoryCache[catName] = (obj && obj.words) ? obj.words : [];
+              deck = categoryCache[catName];
+              categoryLoadState = "loaded";
+            } catch (e) {
+              categoryLoadState = "error";
+            }
           } else {
             categoryLoadState = "error";
           }
@@ -631,7 +694,7 @@
   function updateTopBarForView() {
     var titleEl = document.getElementById("categoryTitle");
     if (currentView === "category") {
-      titleEl.textContent = currentCategoryName;
+      titleEl.textContent = currentCategoryName || "";
       currentActionLabel = "+";
     } else {
       titleEl.textContent = "生词本";
@@ -651,6 +714,24 @@
 
     var progressEl = document.getElementById("progressLabel");
     var wrap = document.getElementById("contentWrap");
+
+    if (currentView === "category" && currentCategoryName === null) {
+      progressEl.textContent = "";
+      wrap.innerHTML = "";
+      var catListDiv = document.createElement("div");
+      if (categoryListState === "error") {
+        catListDiv.className = "empty-state";
+        catListDiv.textContent = "类目加载失败,请检查网络";
+      } else if (categoryListState === "loaded") {
+        catListDiv.className = "empty-state";
+        catListDiv.textContent = "暂无类目";
+      } else {
+        catListDiv.className = "loading-state";
+        catListDiv.textContent = "加载中...";
+      }
+      wrap.appendChild(catListDiv);
+      return;
+    }
 
     if (currentView === "category" && categoryLoadState === "loading") {
       progressEl.textContent = "";
