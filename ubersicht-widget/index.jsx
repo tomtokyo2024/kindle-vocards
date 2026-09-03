@@ -1,10 +1,10 @@
 // 日语单词滚动显示 widget
-// 数据来源:kindle-vocards 项目已发布的 Google Sheets CSV
+// 数据来源:kindle-vocards 项目同一个 Apps Script API(类目/词条)+ Google Sheets CSV(生词本)
 //
 // ┌─ 常改的三处配置都在最上面 ─────────────────────────┐
 // │ 1. POSITION      —— 显示在屏幕的哪个位置            │
 // │ 2. ROTATE_MS     —— 多久换一个词                    │
-// │ 3. CATEGORIES    —— 有哪些类目 / 默认显示哪个        │
+// │ 3. NOTEBOOK_NAME —— 生词本栏目名(其余类目全自动)    │
 // └────────────────────────────────────────────────┘
 
 // ==== 1. 位置 ====
@@ -40,65 +40,74 @@ function px(n) {
 const ROTATE_MS = 30000;
 
 // ==== 3. 类目 ====
-// 加类目 = 在这个数组里加一行(name 随便写,gid 从表格 URL 里抄)。
-// 和 vocab-cards/index.html 里 CATEGORY_SOURCES 的 gid 保持一致。
-//
-// notebook: true 表示这一栏是生词本(gid=0)。生词本的 CSV 比类目多了
-// "来源类目""加入时间"两列,所以要用不同的列顺序数组解析,靠这个标记区分。
-// 这里只读不写,不会碰到生词本的 +/- 同步。
-const CATEGORIES = [
-  { name: "特色记忆法则", gid: "80857184" },
-  { name: "红薯老师词", gid: "1695379107" },
-  { name: "生词本", gid: "0", notebook: true },
-];
-
-// 启动时默认显示哪个类目(填上面的 name)。运行时点标签页可以切换。
+// 类目现在和 index.html 一样,自动从 Apps Script 的 ?action=categories 读取,
+// Google Sheets 里新建一个 tab 就会自动出现,不用改这个文件。
+// 这里只需要配置生词本栏目名(固定读法不一样,靠这个标记区分)和启动时默认显示哪个栏目。
+const NOTEBOOK_NAME = "生词本";
 const DEFAULT_CATEGORY = "特色记忆法则";
 
 // ============ 以下一般不用改 ============
 
+// 和 index.html 里的 NOTEBOOK_WRITE_URL 保持一致
+const APPS_SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbyGL9tXO1WBigSsMkplydjTG77r2s3VvmXL0hntnFnObSPhC-G7I57rw3Fo-uA9zOblrg/exec";
+
+// 生词本走 CSV(和 index.html 的 NOTEBOOK_READ_CSV_URL 一致),必须是 gviz/tq 格式,不要用 pub?output=csv
 const SHEET_ID = "1Cs3VzifCQzwrglVBGhSxTmLin2gWVFPiTbMawNv1D_0";
+const NOTEBOOK_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&gid=0";
 
-// CSV 链接必须是 gviz/tq 格式,不要用 pub?output=csv
-function csvUrl(gid) {
-  return (
-    "https://docs.google.com/spreadsheets/d/" +
-    SHEET_ID +
-    "/gviz/tq?tqx=out:csv&gid=" +
-    gid
-  );
-}
-
-// CSV 磁盘缓存:每个类目一个文件,最多每 CACHE_MINUTES 分钟重拉一次,其余时间直接 cat。
+// 磁盘缓存:类目列表、每个类目的词条、生词本 CSV 各一份,最多每 CACHE_MINUTES 分钟重拉一次。
 // curl 失败时先写 .tmp 再 mv,所以网络断了会保留旧数据而不是清空。
-// 定成 10 分钟是迁就生词本:类目词表基本不变,但生词本会随时增删,
-// 一小时的滞后太久了。三个表加起来一次约 170KB,10 分钟一次不算重。
+// 定成 10 分钟是迁就生词本:类目词表基本不变,但生词本会随时增删,一小时的滞后太久了。
 const CACHE_PREFIX = "/tmp/vocab-widget-cache-";
 const CACHE_MINUTES = 10;
 
-// 所有类目一次性全部拉下来,切换类目时不需要重新请求,点一下就切。
 const DELIM = "<<<VOCAB-CAT:";
 
-export const command = CATEGORIES.map(
-  (c) => `
-CACHE="${CACHE_PREFIX}${c.gid}.csv";
-if [ ! -s "$CACHE" ] || [ -n "$(find "$CACHE" -mmin +${CACHE_MINUTES} 2>/dev/null)" ]; then
-  curl -sL --max-time 20 "${csvUrl(c.gid)}" -o "$CACHE.tmp" && [ -s "$CACHE.tmp" ] && mv "$CACHE.tmp" "$CACHE";
-  rm -f "$CACHE.tmp";
+// 类目名可能含中文/特殊字符,不直接拿来当文件名,用 shasum 哈希出一个安全的缓存文件名。
+// 类目列表本身是一次性全部拉下来、动态循环取词,shell 脚本里没法用 JS 的 CATEGORIES.map 了,
+// 改成一段完整脚本:先拉类目列表,用 grep/sed 摘出双引号里的名字(第一个是 "categories" 键本身要跳过),
+// 再逐个类目拉词条,和生词本 CSV 一起用同一个 DELIM 分隔输出。
+export const command = `
+CATS_CACHE="${CACHE_PREFIX}categories.json";
+if [ ! -s "$CATS_CACHE" ] || [ -n "$(find "$CATS_CACHE" -mmin +${CACHE_MINUTES} 2>/dev/null)" ]; then
+  curl -sL --max-time 20 "${APPS_SCRIPT_URL}?action=categories" -o "$CATS_CACHE.tmp" && [ -s "$CATS_CACHE.tmp" ] && mv "$CATS_CACHE.tmp" "$CATS_CACHE";
+  rm -f "$CATS_CACHE.tmp";
 fi;
-echo "${DELIM}${c.name}";
-cat "$CACHE" 2>/dev/null;
+CATS=$(grep -o '"[^"]*"' "$CATS_CACHE" 2>/dev/null | sed -n '2,$p' | sed 's/^"//; s/"$//');
+while IFS= read -r cat; do
+  [ -z "$cat" ] && continue;
+  HASH=$(printf '%s' "$cat" | shasum -a 256 | cut -c1-16);
+  CACHE="${CACHE_PREFIX}cat-$HASH.json";
+  if [ ! -s "$CACHE" ] || [ -n "$(find "$CACHE" -mmin +${CACHE_MINUTES} 2>/dev/null)" ]; then
+    curl -sL --max-time 20 -G --data-urlencode "action=words" --data-urlencode "category=$cat" "${APPS_SCRIPT_URL}" -o "$CACHE.tmp" && [ -s "$CACHE.tmp" ] && mv "$CACHE.tmp" "$CACHE";
+    rm -f "$CACHE.tmp";
+  fi;
+  echo "${DELIM}$cat";
+  cat "$CACHE" 2>/dev/null;
+  echo;
+done <<EOF
+$CATS
+EOF
+NB_CACHE="${CACHE_PREFIX}notebook.csv";
+if [ ! -s "$NB_CACHE" ] || [ -n "$(find "$NB_CACHE" -mmin +${CACHE_MINUTES} 2>/dev/null)" ]; then
+  curl -sL --max-time 20 "${NOTEBOOK_CSV_URL}" -o "$NB_CACHE.tmp" && [ -s "$NB_CACHE.tmp" ] && mv "$NB_CACHE.tmp" "$NB_CACHE";
+  rm -f "$NB_CACHE.tmp";
+fi;
+echo "${DELIM}${NOTEBOOK_NAME}";
+cat "$NB_CACHE" 2>/dev/null;
 echo;
-`
-).join("\n");
+`;
 
-// 刷新周期 == 换词周期。CSV 不会每次都重新请求,由上面的磁盘缓存挡住。
+// 刷新周期 == 换词周期。数据不会每次都重新请求,由上面的磁盘缓存挡住。
 export const refreshFrequency = ROTATE_MS;
 
-// ==== CSV 解析(照搬 vocab-cards/index.html 的 parseCsv / parseCsvToWords)====
+// ==== 生词本 CSV 解析(照搬 vocab-cards/index.html 的 parseCsv / parseCsvToWords)====
+// 类目词条现在是 JSON(Apps Script 返回,字段名已经对好,不用再按列顺序映射),
+// 只有生词本还是 CSV,所以 CSV 解析器和固定列顺序只留给生词本用。
 
-// 类目 CSV 列的固定顺序
-const CATEGORY_CSV_FIELDS = [
+const NOTEBOOK_CSV_FIELDS = [
   "word",
   "kana",
   "pos",
@@ -107,18 +116,9 @@ const CATEGORY_CSV_FIELDS = [
   "example_jp",
   "example_cn",
   "jlpt_point",
-];
-
-// 生词本 CSV 列的固定顺序:前 8 列和类目一致,末尾多了来源类目和加入时间
-const NOTEBOOK_CSV_FIELDS = CATEGORY_CSV_FIELDS.concat([
   "source_category",
   "added_at",
-]);
-
-function fieldsFor(catName) {
-  const c = CATEGORIES.find((x) => x.name === catName);
-  return c && c.notebook ? NOTEBOOK_CSV_FIELDS : CATEGORY_CSV_FIELDS;
-}
+];
 
 // 极简 CSV 解析器,处理逗号分隔和引号转义
 function parseCsv(text) {
@@ -194,45 +194,55 @@ function parseCsvToWords(text, fields) {
   return result;
 }
 
-// 把 command 的输出按分隔行切成 { 类目名: 词条数组 }
+// 把 command 的输出按分隔行切成 { 类目名: 词条数组 },同时收集类目出现的顺序(排除生词本)。
 function parseAllCategories(text) {
   const byCat = {};
+  const catNames = [];
   const parts = String(text || "").split(DELIM);
   for (let i = 1; i < parts.length; i++) {
     const p = parts[i];
     const nl = p.indexOf("\n");
     if (nl === -1) continue;
     const name = p.slice(0, nl).trim();
+    const body = p.slice(nl + 1);
+    if (name === NOTEBOOK_NAME) {
+      try {
+        byCat[name] = parseCsvToWords(body, NOTEBOOK_CSV_FIELDS);
+      } catch (e) {
+        byCat[name] = [];
+      }
+      continue;
+    }
+    catNames.push(name);
     try {
-      byCat[name] = parseCsvToWords(p.slice(nl + 1), fieldsFor(name));
+      const obj = JSON.parse(body);
+      byCat[name] = (obj && obj.words) || [];
     } catch (e) {
       byCat[name] = [];
     }
   }
-  return byCat;
+  return { byCat, catNames };
 }
 
 // 内存缓存:同一份输出文本只解析一次,30 秒一次的刷新不会重复解析。
 let cachedText = null;
-let cachedByCat = {};
+let cachedParsed = { byCat: {}, catNames: [] };
 
-function getByCat(text) {
-  if (text === cachedText) return cachedByCat;
+function getParsed(text) {
+  if (text === cachedText) return cachedParsed;
   cachedText = text;
-  cachedByCat = parseAllCategories(text);
-  return cachedByCat;
+  cachedParsed = parseAllCategories(text);
+  return cachedParsed;
 }
 
 // ==== 状态 ====
-
-const defaultIndex = Math.max(
-  0,
-  CATEGORIES.findIndex((c) => c.name === DEFAULT_CATEGORY)
-);
+// 按名字记选中栏目而不是按下标,类目列表长度/顺序在刷新之间可能变化(新增/删除 tab),
+// 下标会错位指到别的栏目,名字不会。
 
 export const initialState = {
-  catIndex: defaultIndex,
+  selectedName: DEFAULT_CATEGORY,
   byCat: {},
+  catNames: [],
   error: null,
 };
 
@@ -241,10 +251,11 @@ export const updateState = (event, prev) => {
     if (event.error) {
       return { ...prev, error: String(event.error) };
     }
-    return { ...prev, byCat: getByCat(event.output), error: null };
+    const { byCat, catNames } = getParsed(event.output);
+    return { ...prev, byCat, catNames, error: null };
   }
   if (event.type === "SET_CATEGORY") {
-    return { ...prev, catIndex: event.index };
+    return { ...prev, selectedName: event.name };
   }
   return prev;
 };
@@ -310,13 +321,14 @@ export const className = `
 
 // ==== 渲染 ====
 export const render = (state, dispatch) => {
-  const cat = CATEGORIES[state.catIndex] || CATEGORIES[0];
+  const tabs = (state.catNames || []).concat([NOTEBOOK_NAME]);
+  const selectedName = tabs.indexOf(state.selectedName) !== -1 ? state.selectedName : tabs[0];
   const byCat = state.byCat || {};
-  const words = byCat[cat.name] || [];
+  const words = byCat[selectedName] || [];
 
-  // 拉到了数据但一条没有(比如生词本还没加过词),跟"根本没拉到"是两回事,
-  // 分开提示,免得把空生词本误报成加载失败。
-  const loaded = Object.prototype.hasOwnProperty.call(byCat, cat.name);
+  // 拉到了数据但一条没有(比如生词本还没加过词,或类目列表还没拉回来),跟"根本没拉到"是两回事,
+  // 分开提示,免得把空生词本/加载中误报成加载失败。
+  const loaded = Object.prototype.hasOwnProperty.call(byCat, selectedName);
 
   // 按时间分桶取词,顺序滚动;不依赖组件自身状态,重载后也能接着走。
   const w = words.length
@@ -325,15 +337,15 @@ export const render = (state, dispatch) => {
 
   return (
     <div>
-      {CATEGORIES.length > 1 ? (
+      {tabs.length > 1 ? (
         <div className="vw-tabs">
-          {CATEGORIES.map((c, i) => (
+          {tabs.map((name) => (
             <div
-              key={c.gid}
-              className={"vw-tab" + (i === state.catIndex ? " vw-tab-active" : "")}
-              onClick={() => dispatch({ type: "SET_CATEGORY", index: i })}
+              key={name}
+              className={"vw-tab" + (name === selectedName ? " vw-tab-active" : "")}
+              onClick={() => dispatch({ type: "SET_CATEGORY", name })}
             >
-              {c.name}
+              {name}
             </div>
           ))}
         </div>
@@ -347,7 +359,7 @@ export const render = (state, dispatch) => {
           {w.mnemonic ? <div className="vw-mnemonic">{w.mnemonic}</div> : null}
         </div>
       ) : (
-        <div className="vw-error">{loaded ? "这一栏还没有词" : "加载失败"}</div>
+        <div className="vw-error">{loaded ? "这一栏还没有词" : "加载中/加载失败"}</div>
       )}
     </div>
   );
