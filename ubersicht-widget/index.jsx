@@ -347,15 +347,21 @@ export const render = (state, dispatch) => {
     <div>
       {tabs.length > 1 ? (
         <div className="vw-tabs">
-          {tabs.map((name) => (
-            <div
-              key={name}
-              className={"vw-tab" + (name === selectedName ? " vw-tab-active" : "")}
-              onClick={() => dispatch({ type: "SET_CATEGORY", name })}
-            >
-              {name}
-            </div>
-          ))}
+          {tabs.map((name) => {
+            const count = Object.prototype.hasOwnProperty.call(byCat, name)
+              ? byCat[name].length
+              : null;
+            return (
+              <div
+                key={name}
+                className={"vw-tab" + (name === selectedName ? " vw-tab-active" : "")}
+                onClick={() => dispatch({ type: "SET_CATEGORY", name })}
+              >
+                {name}
+                {count !== null ? "（" + count + "）" : ""}
+              </div>
+            );
+          })}
         </div>
       ) : null}
 
