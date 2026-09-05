@@ -1,0 +1,1 @@
+../ubersicht-widget/widget-core.jsx

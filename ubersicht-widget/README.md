@@ -1,23 +1,36 @@
 # Übersicht 桌面 widget
 
 桌面常驻的日语单词滚动卡片,读的是和 `index.html` 同一个 Google Sheet。
+桌面上左右各放一个:右侧的源文件在这个目录(`ubersicht-widget/`),左侧的在
+旁边的 `ubersicht-widget-left/`。两边共用同一份逻辑 —— 都在 `widget-core.jsx`
+里,`ubersicht-widget-left/widget-core.jsx` 只是指回这边文件的软链接,不是
+复制。真要改类目解析、生词本 CSV 字段、缓存策略这些行为,改这边的
+`widget-core.jsx` 就够了,左右两边自动同时生效。
+
+各自的 `index.jsx` 现在很薄,只负责一件事:配置自己的 `POSITION`(左/右),
+然后调用 `createVocabWidget(POSITION)`。
 
 ## 安装
 
-这个目录是**源文件**;Übersicht 那边是一个指回来的软链接:
+这两个目录都是**源文件**;Übersicht 那边是指回来的软链接:
 
 ```sh
 ln -s ~/Documents/Projects/vocab-cards/ubersicht-widget \
       ~/Library/Application\ Support/Übersicht/widgets/vocab-widget
+
+ln -s ~/Documents/Projects/vocab-cards/ubersicht-widget-left \
+      ~/Library/Application\ Support/Übersicht/widgets/vocab-widget-left
 ```
 
-改这里的 `index.jsx`,菜单栏 → Refresh All Widgets 就生效,不用来回拷贝。
+改 `widget-core.jsx` 或任意一份 `index.jsx`,菜单栏 → Refresh All Widgets 就
+生效,不用来回拷贝。
 (Übersicht 用 `fs.stat` 扫描 widgets 目录,会跟随软链接。但 FSEvents 不一定
 监听得到软链目录里的改动,所以改完最好手动 Refresh 一次,别指望自动重载。)
 
 ## 配置
 
-常改的几处都在 `index.jsx` 顶部:
+每个 widget 常改的只有自己 `index.jsx` 顶部的 `POSITION`(位置)。其余配置在
+`widget-core.jsx` 里,左右共用:
 
 | 配置 | 作用 |
 | --- | --- |
@@ -32,7 +45,7 @@ ln -s ~/Documents/Projects/vocab-cards/ubersicht-widget \
 
 ## 和主项目的耦合
 
-`index.jsx` 复制了 `index.html` 里的这几样东西,**改了那边要记得同步这边**:
+`widget-core.jsx` 复制了 `index.html` 里的这几样东西,**改了那边要记得同步这边**:
 
 - `parseCsv` / `parseCsvToWords` 解析函数(现在只有生词本用得到,类目已经是 JSON)
 - `NOTEBOOK_CSV_FIELDS`(10 列)的列顺序
