@@ -306,6 +306,17 @@ echo;
       margin-top: ${px(6)};
     }
 
+    .vw-example {
+      font-size: ${px(14 * 0.8)};
+      color: rgba(255, 255, 255, 0.7);
+      margin-top: ${px(6)};
+    }
+
+    .vw-example-cn {
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: ${px(2)};
+    }
+
     .vw-error {
       font-size: ${px(14)};
       color: rgba(255, 255, 255, 0.8);
@@ -356,6 +367,8 @@ echo;
             {w.kana ? <div className="vw-kana">{w.kana}</div> : null}
             {w.meaning_cn ? <div className="vw-meaning">{w.meaning_cn}</div> : null}
             {w.mnemonic ? <div className="vw-mnemonic">{w.mnemonic}</div> : null}
+            {w.example_jp ? <div className="vw-example">{w.example_jp}</div> : null}
+            {w.example_cn ? <div className="vw-example vw-example-cn">{w.example_cn}</div> : null}
           </div>
         ) : (
           <div className="vw-error">{loaded ? "这一栏还没有词" : "加载中/加载失败"}</div>
